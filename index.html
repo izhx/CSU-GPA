@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>中南大学GPA计算</title> <!-- 作者 izhx -->
+    <script src="http://oss.sheetjs.com/js-xlsx/xlsx.full.min.js"></script>
+</head>
+<body>
+<input type="file" onchange="importFile(this)"/>
+
+<button onclick="downloadExl(excel_json)">导出表格</button>
+
+<div id="demo"></div>
+<p>待添加使用说明</p>
+
+<script>
+    /*
+    FileReader共有4种读取方法：
+    1.readAsArrayBuffer(file)：将文件读取为ArrayBuffer。
+    2.readAsBinaryString(file)：将文件读取为二进制字符串
+    3.readAsDataURL(file)：将文件读取为Data URL
+    4.readAsText(file, [encoding])：将文件读取为文本，encoding缺省值为'UTF-8'
+                 */
+    var wb;//读取完成的数据
+    var rABS = false; //是否将文件读取为二进制字符串
+    var excel_json;
+
+
+    function importFile(obj) {//导入
+        if (!obj.files) {
+            return;
+        }
+        var f = obj.files[0];
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var data = e.target.result;
+            if (rABS) {
+                wb = XLSX.read(btoa(fixdata(data)), {  //手动转化
+                    type: 'base64'
+                });
+            } else {
+                wb = XLSX.read(data, {
+                    type: 'binary'
+                });
+            }
+            excel_json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            //wb.SheetNames[0]是获取Sheets中第一个Sheet的名字
+            //wb.Sheets[Sheet名]获取第一个Sheet的数据
+            // document.getElementById("demo").innerHTML = excel_json;
+            // sheet = wb.Sheets[wb.SheetNames[0]]
+            convertScore(excel_json);
+        };
+        if (rABS) {
+            reader.readAsArrayBuffer(f);
+        } else {
+            reader.readAsBinaryString(f);
+        }
+    }
+
+    function fixdata(data) { //文件流转BinaryString
+        var o = "",
+            l = 0,
+            w = 10240;
+        for (; l < data.byteLength / w; ++l) o += String.fromCharCode.apply(null, new Uint8Array(data.slice(l * w, l * w + w)));
+        o += String.fromCharCode.apply(null, new Uint8Array(data.slice(l * w)));
+        return o;
+    }
+
+    function convertScore(json) {
+        var credit = 0, s4 = 0, p4 = 0;
+        for (var i = 1; i < json.length; ++i) {
+            if (typeof (excel_json[i]["成绩"]) == 'string') {
+                excel_json[i]['成绩'] = label_score(excel_json[i]["成绩"]);
+            }
+            excel_json[i]['标准4'] = standard4(excel_json[i]['成绩']);
+            s4 += excel_json[i]['学分'] * excel_json[i]['标准4'];
+            excel_json[i]['北大'] = pku4(excel_json[i]['成绩']);
+            p4 += excel_json[i]['学分'] * excel_json[i]['北大'];
+            credit += excel_json[i]['学分']
+        }
+        s4 /= credit;
+        p4 /= credit;
+        document.getElementById("demo").innerHTML = '成功，可以下载。标准4分（中南大学所用）算法：'
+            + s4 + '分，北大算法：' + p4 + '分。';
+    }
+
+    function label_score(label) {
+        switch (label) {
+            case '优':
+                return 95;
+            case '良':
+                return 85;
+            case '中':
+                return 75;
+            case '差':
+                return 65;
+            case '及格':
+                return 60;
+            case '不及格':
+                return 0;
+            default:
+                return 0;
+        }
+    }
+
+    function standard4(score) {
+        if (score >= 90)
+            return 4.0;
+        else if (score >= 80)
+            return 3.0;
+        else if (score >= 70)
+            return 2.0;
+        else if (score >= 60)
+            return 1.0;
+        else
+            return 0.0;
+
+    }
+
+    function pku4(score) {
+        if (score >= 90)
+            return 4.0;
+        else if (score >= 85)
+            return 3.7;
+        else if (score >= 82)
+            return 3.3;
+        else if (score >= 78)
+            return 3.0;
+        else if (score >= 75)
+            return 2.7;
+        else if (score >= 72)
+            return 2.3;
+        else if (score >= 68)
+            return 2.0;
+        else if (score >= 64)
+            return 1.5;
+        else if (score >= 60)
+            return 1.0;
+        else
+            return 0.0;
+    }
+
+
+    function downloadExl(data) {
+        /* 创建worksheet */
+        var ws = XLSX.utils.json_to_sheet(data);
+        /* 新建空workbook，然后加入worksheet */
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "sheet1");
+        /* 生成xlsx文件 */
+        XLSX.writeFile(wb, "转换后成绩.xlsx");
+    }
+
+</script>
+</body>
+</html>
